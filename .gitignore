@@ -12,3 +12,4 @@ noscope.txt
 benchmarking
 # Added by goreleaser init:
 dist/
+recording.pws
