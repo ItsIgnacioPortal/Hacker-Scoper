@@ -4,8 +4,8 @@
   <a href="https://github.com/ItsIgnacioPortal/hacker-scoper/actions/workflows/gorelease.yml"><img src="https://github.com/ItsIgnacioPortal/Hacker-Scoper/actions/workflows/gorelease.yml/badge.svg?event=push"></a>
   <a href="https://go.dev"><img alt="Golang icon" src="https://img.shields.io/badge/Built_with-GoLang-00acd7?logo=go"></a>
   <a href="https://github.com/ItsIgnacioPortal/Hacker-Scoper/releases"><img alt="Link to the latest version" src="https://img.shields.io/github/v/release/itsignacioportal/hacker-scoper"></a>
-  <a href="LICENSE.md"><img alt="Badge depicting the proyect license, the aGPLv3" src="https://img.shields.io/badge/License-aGPLv3-663366?logo=GNU"></a>
   <a href="https://www.bestpractices.dev/projects/10594"><img alt="OpenSSF best practices badge." src="https://www.bestpractices.dev/projects/10594/badge?c"></a>
+  <a href="https://github.com/vavkamil/awesome-bugbounty-tools"><img alt="Mentioned in Awesome Bug Bounty Tools." src="https://awesome.re/mentioned-badge.svg"></a>
 </p>
 
 
