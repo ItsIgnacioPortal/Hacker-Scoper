@@ -2,7 +2,7 @@
 
 package main
 
-func StartBenchmark() bool {
+func StartBenchmark(profileFilenamePrefix string) bool {
 	return true
 }
 

@@ -11,13 +11,13 @@ import (
 var cpufile *os.File
 var ramfile *os.File
 
-func StartBenchmark() bool {
-	cpufile, err := os.Create(`.\benchmarking\profiling-output\cpu.prof`)
+func StartBenchmark(profileFilenamePrefix string) bool {
+	cpufile, err := os.Create(`.\benchmarking\profiling-output\cpu` + profileFilenamePrefix + `.prof`)
 	if err != nil {
 		crash("could not create CPU profile: ", err)
 	}
 
-	ramfile, err = os.Create(`.\benchmarking\profiling-output\ram.prof`)
+	ramfile, err = os.Create(`.\benchmarking\profiling-output\ram` + profileFilenamePrefix + `.prof`)
 	if err != nil {
 		crash("could not create CPU profile: ", err)
 	}

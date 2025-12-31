@@ -101,7 +101,7 @@ const colorBlue = "\033[38;2;0;204;255m"
 
 func main() {
 
-	StartBenchmark()
+	StartBenchmark("1")
 
 	var targetsListFilepath string
 	var includeUnsure bool
@@ -532,6 +532,9 @@ func main() {
 			panic(err)
 		}
 	}
+
+	StopBenchmark()
+	StartBenchmark("2")
 
 	// Parse all inscopeLines lines
 	inscopeScopes, err := parseAllLines(inscopeLines, true)
@@ -1276,7 +1279,7 @@ func parseNmapOctet(part string) ([]uint8, error) {
 
 // Function to extract company names only
 func extractCompanyNames(jsonPath string) ([]string, error) {
-	file, err := os.Open(jsonPath)  // #nosec G304 -- Intended behavior
+	file, err := os.Open(jsonPath) // #nosec G304 -- Intended behavior
 	if err != nil {
 		return nil, err
 	}
@@ -1297,7 +1300,7 @@ func extractCompanyNames(jsonPath string) ([]string, error) {
 
 // Efficiently load a single Program by index from the firebounty JSON
 func loadProgramByIndex(jsonPath string, index int) (*Program, error) {
-	file, err := os.Open(jsonPath)  // #nosec G304 -- Intended behavior
+	file, err := os.Open(jsonPath) // #nosec G304 -- Intended behavior
 	if err != nil {
 		return nil, err
 	}
