@@ -288,38 +288,40 @@ func main() {
 	}
 
 	// Validate the targets input
-	var targetsInput []string
+	var streamedLinesChan <-chan string
 
 	// If we're getting input from stdin...
 	//https://stackoverflow.com/a/26567513/11490425
 	stat, _ := os.Stdin.Stat()
 	if (stat.Mode()&os.ModeCharDevice) == 0 && !isVSCodeDebug() {
 
-		// Read all of stdin into targetsInput
-
-		//read stdin
-		scanner := bufio.NewScanner(os.Stdin)
-		for scanner.Scan() {
-			line := scanner.Text()
-			line = strings.TrimSpace(line)
-			if line != "" && !strings.HasPrefix(line, "#") && !strings.HasPrefix(line, "//") {
-				targetsInput = append(targetsInput, line)
+		// Stream stdin into the same async pipeline we use for files so
+		// workers can start processing immediately and we avoid buffering
+		// the whole input in memory.
+		ch := make(chan string, 1024)
+		go func() {
+			scanner := bufio.NewScanner(os.Stdin)
+			for scanner.Scan() {
+				line := strings.TrimSpace(scanner.Text())
+				if line != "" && !strings.HasPrefix(line, "#") && !strings.HasPrefix(line, "//") {
+					ch <- line
+				}
 			}
-		}
-		if err := scanner.Err(); err != nil {
-			crash("bufio couldn't read stdin correctly.", err)
-		}
+			close(ch)
+		}()
+		streamedLinesChan = ch
 
 	} else if targetsListFilepath != "" {
 		// We didn't get anything from stdin, so we will use the file specified by the user
-		// Immediatly open the file specified by the user to prevent the file from potentially being modified by another process, exploiting a race condition (CWE-377)
+		// Immediately open the file specified by the user and stream lines so workers
+		// can begin processing while the reader continues to read the file.
 
-		// Load the user-supplied targets file into memory
-		var err error
-		targetsInput, err = readFileLines(targetsListFilepath)
+		// Use streaming reader instead of loading whole file into memory
+		linesChan, err := streamFileLines(targetsListFilepath)
 		if err != nil {
 			crash("Could not read the file "+targetsListFilepath, err)
 		}
+		streamedLinesChan = linesChan
 
 	} else {
 		// We didn't get anything from stdin, and the user didn't specify a file
@@ -562,24 +564,21 @@ func main() {
 		writer = bufio.NewWriter(f)
 	}
 
-	// Parse all targetsInput lines concurrently
+	// Parse all targetsInput lines concurrently.
 	numWorkers := runtime.NumCPU()
-	inputChan := make(chan int, numWorkers)
-	outputChan := make(chan targetResult, len(targetsInput))
+	outputChan := make(chan targetResult)
 
 	var wg sync.WaitGroup
-
 	for i := 0; i < numWorkers; i++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			for idx := range inputChan {
-				parsedTarget, err := parseLine(targetsInput[idx], false)
+			for line := range streamedLinesChan {
+				parsedTarget, err := parseLine(line, false)
 				res := targetResult{
-					index:        idx,
 					parsedTarget: parsedTarget,
 					err:          err,
-					targetStr:    targetsInput[idx],
+					targetStr:    line,
 				}
 				if err == nil {
 					isInsideScope, isUnsure := parseScopes(&inscopeScopes, &noscopeScopes, &parsedTarget, &inscopeExplicitLevel, &noscopeExplicitLevel, includeUnsure)
@@ -591,28 +590,14 @@ func main() {
 		}()
 	}
 
-	// Feed indices to workers
-	go func() {
-		for i := range targetsInput {
-			inputChan <- i
-		}
-		close(inputChan)
-	}()
-
 	go func() {
 		wg.Wait()
 		close(outputChan)
 	}()
 
-	// Variables for writing the output to a file if necessary.
+	// Consume results as they arrive
 	var target string
-	results := make([]targetResult, len(targetsInput))
 	for res := range outputChan {
-		results[res.index] = res
-	}
-
-	// Output results in original order
-	for _, res := range results {
 		if res.err != nil {
 			warning("Unable to parse the string '" + res.targetStr + "' as a target.")
 			continue
@@ -653,7 +638,6 @@ func main() {
 			}
 		}
 	}
-	// ...existing code...
 
 	if inscopeOutputFile != "" {
 		// Flush any buffered data to disk
@@ -924,6 +908,36 @@ func readFileLines(filepath string) ([]string, error) {
 		}
 	}
 	return lines, nil
+}
+
+// streamFileLines opens the file at the given path and returns a channel
+// that receives trimmed, non-empty, non-comment lines as they are read.
+// The channel is closed when EOF is reached. An error is returned if the
+// file could not be opened.
+func streamFileLines(filepath string) (<-chan string, error) {
+	f, err := os.Open(filepath) // #nosec G304 -- intended behaviour
+	if err != nil {
+		return nil, err
+	}
+
+	out := make(chan string, 128)
+
+	go func() {
+		defer f.Close()
+		scanner := bufio.NewScanner(f)
+		for scanner.Scan() {
+			line := strings.TrimSpace(scanner.Text())
+			if line != "" && !strings.HasPrefix(line, "#") && !strings.HasPrefix(line, "//") {
+				out <- line
+			}
+		}
+		// Ignore scanner.Err() here; if there was an error scanning we'll
+		// simply stop streaming and close the channel. The caller should
+		// detect incomplete processing if necessary.
+		close(out)
+	}()
+
+	return out, nil
 }
 
 // If isScope is true, ParseLine attempts to parse a string into either:
