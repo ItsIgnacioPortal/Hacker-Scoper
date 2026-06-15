@@ -658,10 +658,10 @@ func main() {
 				if outputCSVFormat {
 					if res.isUnsure {
 						if includeUnsure {
-							fmt.Println("unsure," + target)
+							fmt.Println("unsure,\"" + target + "\"")
 						}
 					} else {
-						fmt.Println("inscope," + target)
+						fmt.Println("inscope,\"" + target + "\"")
 					}
 				} else {
 					if res.isUnsure {
