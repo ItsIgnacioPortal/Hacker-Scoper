@@ -284,22 +284,8 @@ func main() {
 		if firebountyJSONPath == "" && !chainMode {
 			warning("This OS isn't officially supported. The firebounty JSON will be downloaded in the current working directory. To override this behavior, use the \"--database\" flag.")
 		}
-	} else {
-		//If the folder exists...
-		_, err := os.Stat(firebountyJSONPath)
-		if errors.Is(err, os.ErrNotExist) {
-			//Create the folder
-			err := os.Mkdir(firebountyJSONPath, 0700)
-			if err != nil {
-				crash("Unable to create the folder \""+firebountyJSONPath+"\"", err)
-			}
-		} else if err != nil {
-			// Schrodinger: file may or may not exist. See err for details.
-			crash("Could not verify existence of the folder \""+firebountyJSONPath+"\"!", err)
-		}
+		firebountyJSONPath = firebountyJSONPath + firebountyJSONFilename
 	}
-
-	firebountyJSONPath = firebountyJSONPath + firebountyJSONFilename
 
 	if !chainMode {
 		fmt.Println(banner)
