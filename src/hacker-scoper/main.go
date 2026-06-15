@@ -692,13 +692,13 @@ func main() {
 				if outputCSVFormat {
 					if res.isUnsure {
 						if includeUnsure {
-							_, err = writer.WriteString("unsure," + target + "\n")
+							_, err = writer.WriteString("unsure,\"" + target + "\"\n")
 							if err != nil {
 								crash("Unable to write to output file", err)
 							}
 						}
 					} else {
-						_, err = writer.WriteString("inscope," + target + "\n")
+						_, err = writer.WriteString("inscope,\"" + target + "\"\n")
 						if err != nil {
 							crash("Unable to write to output file", err)
 						}
