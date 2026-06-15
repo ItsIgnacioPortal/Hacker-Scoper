@@ -106,6 +106,8 @@ Usage: hacker-scoper --file /path/to/targets [--company company | --inscopes-fil
 |  | --enable-private-tlds | Set this flag to enable the use of company scope domains with private TLDs. This essentially disables the bug-bounty-program misconfiguration detection. |
 | -ch | --chain-mode<br>--raw<br>--plain |  In "chain-mode" we only output the important information. No decorations. |
 |  | --database /path/to/database | Custom path to the cached firebounty database |
+|  | --update-db | Set this flag to update the database and then exit immediately. |
+|  | --no-update | Set this flag to avoid checking for updates during this run. |
 | -iu | --include-unsure |  Include "unsure" assets in the output. An unsure asset is an asset that's not in scope, but is also not out of scope. Very probably unrelated to the bug bounty program. |
 | -o | --output /path/to/outputfile |  Save the inscope assets to a file |
 |  | --csv | Output in CSV format |

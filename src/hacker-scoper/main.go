@@ -113,6 +113,8 @@ func main() {
 
 	var quietMode bool
 	var showVersion bool
+	var updateAndQuit bool
+	var skipUpdateCheck bool
 	var company string
 	var inscopeExplicitLevel int //should only be [0], 1, or 2
 	var noscopeExplicitLevel int //should only be [0], 1, or 2
@@ -168,13 +170,18 @@ func main() {
 
   -ch, --chain-mode, --plain, --raw, --no-ansi
       In "chain-mode" we only output the important information. No decorations.
-	    Default: false
 
   --database /path/to/database
       Custom path to the cached firebounty database.
 	  	Default:
 		- Windows: %APPDATA%\hacker-scoper\
 		- Linux: /etc/hacker-scoper/
+
+  --update-db
+      Set this flag to update the database and then exit immediately.
+
+  --no-update
+      Set this flag to avoid checking for updates during this run.
 
   -iu, --include-unsure
       Include "unsure" assets in the output. An unsure asset is an asset that's not in scope, but is also not out of scope. Very probably unrelated to the bug bounty program.
@@ -223,6 +230,11 @@ func main() {
 	flag.BoolVar(&chainMode, "raw", false, "Output only the important information. No decorations.")
 	flag.BoolVar(&chainMode, "no-ansi", false, "Output only the important information. No decorations.")
 	flag.StringVar(&firebountyJSONPath, "database", "", "Custom path to the cached firebounty database")
+	flag.BoolVar(&updateAndQuit, "update-db", false, "Set this flag to update the database and then exit immediately.")
+	flag.BoolVar(&updateAndQuit, "db-update", false, "Set this flag to update the database and then exit immediately.")
+	flag.BoolVar(&updateAndQuit, "update", false, "Set this flag to update the database and then exit immediately.")
+	flag.BoolVar(&skipUpdateCheck, "no-update", false, "Set this flag to avoid checking for updates during this run.")
+	flag.BoolVar(&skipUpdateCheck, "skip-update", false, "Set this flag to avoid checking for updates during this run.")
 	flag.StringVar(&inscopeOutputFile, "o", "", "Save the inscope urls to a file")
 	flag.StringVar(&inscopeOutputFile, "output", "", "Save the inscope urls to a file")
 	flag.BoolVar(&outputCSVFormat, "csv", false, "Output in CSV format")
@@ -247,7 +259,7 @@ func main() {
 `
 
 	if showVersion {
-		fmt.Print("hacker-scoper: v6.2.0\n")
+		fmt.Print("hacker-scoper: v6.2.1\n")
 		os.Exit(0)
 	}
 
@@ -284,28 +296,31 @@ func main() {
 		if firebountyJSONPath == "" && !chainMode {
 			warning("This OS isn't officially supported. The firebounty JSON will be downloaded in the current working directory. To override this behavior, use the \"--database\" flag.")
 		}
-	} else {
-		//If the folder exists...
-		_, err := os.Stat(firebountyJSONPath)
-		if errors.Is(err, os.ErrNotExist) {
-			//Create the folder
-			err := os.Mkdir(firebountyJSONPath, 0700)
-			if err != nil {
-				crash("Unable to create the folder \""+firebountyJSONPath+"\"", err)
-			}
-		} else if err != nil {
-			// Schrodinger: file may or may not exist. See err for details.
-			crash("Could not verify existence of the folder \""+firebountyJSONPath+"\"!", err)
-		}
+		firebountyJSONPath = firebountyJSONPath + firebountyJSONFilename
 	}
-
-	firebountyJSONPath = firebountyJSONPath + firebountyJSONFilename
 
 	if !chainMode {
 		fmt.Println(banner)
 	}
 
-	//validate arguments
+	if updateAndQuit && chainMode {
+		warning("--update-db is not compatible with chain-mode. Use the program exit-code to verify update success programmatically.")
+		os.Exit(2)
+	}
+
+	if updateAndQuit {
+		fmt.Println("[INFO]: Checking for database updates...")
+		err := checkForDatabaseUpdates(&databaseIsUpdating, tmpFile)
+
+		if err != nil {
+			os.Exit(1)
+		} else {
+			fmt.Println("[INFO]: The database is up-to-date. Exiting...")
+			os.Exit(0)
+		}
+	}
+
+	//validate scope levels
 	if inscopeExplicitLevel != 1 && inscopeExplicitLevel != 2 && inscopeExplicitLevel != 3 {
 		var err error
 		crash("Invalid in-scope explicit-level selected", err)
@@ -313,6 +328,14 @@ func main() {
 	if noscopeExplicitLevel != 1 && noscopeExplicitLevel != 2 && noscopeExplicitLevel != 3 {
 		var err error
 		crash("Invalid no-scope explicit-level selected", err)
+	}
+
+	//validate filepath params
+	if scopesListFilepath == "" && outofScopesListFilepath != "" {
+		if !chainMode {
+			warning("out-of-scope filepath specified, but no in-scope filepath specified. Either both or neither must be specified.")
+		}
+		os.Exit(2)
 	}
 
 	// Validate the targets input
@@ -408,25 +431,8 @@ func main() {
 	} else if company != "" {
 		// If the user inputted a company name, we'll lookup said company in the firebounty db
 
-		// If the db exists...
-		if firebountyJSONFileStats, err := os.Stat(firebountyJSONPath); err == nil {
-			//check age. if age > 24hs
-			yesterday := time.Now().Add(-24 * time.Hour)
-			if firebountyJSONFileStats.ModTime().Before(yesterday) {
-				if !chainMode {
-					fmt.Println("[INFO]: +24hs have passed since the last update to the local firebounty database. Updating...")
-				}
-				updateFireBountyJSON(&databaseIsUpdating, tmpFile, true)
-			}
-		} else if errors.Is(err, os.ErrNotExist) {
-			// The database does not exist.
-			// We'll create it.
-			if !chainMode {
-				fmt.Println("[INFO]: Downloading scopes file and saving in \"" + firebountyJSONPath + "\"")
-			}
-			updateFireBountyJSON(&databaseIsUpdating, tmpFile, false)
-		} else {
-			crash("Unable to get information about the database file at \""+firebountyJSONPath+"\". Probably a permissions error with the directory the database is saved at. Try using the database argument like '--database /custom/path/to/store/the/firebounty.json'", err)
+		if !skipUpdateCheck {
+			_ = checkForDatabaseUpdates(&databaseIsUpdating, tmpFile) // #nosec G104 -- A failed database update isn't dangerous.
 		}
 
 		// Get the company names from the JSON file
@@ -664,10 +670,10 @@ func main() {
 				if outputCSVFormat {
 					if res.isUnsure {
 						if includeUnsure {
-							fmt.Println("unsure," + target)
+							fmt.Println("unsure,\"" + target + "\"")
 						}
 					} else {
-						fmt.Println("inscope," + target)
+						fmt.Println("inscope,\"" + target + "\"")
 					}
 				} else {
 					if res.isUnsure {
@@ -692,13 +698,13 @@ func main() {
 				if outputCSVFormat {
 					if res.isUnsure {
 						if includeUnsure {
-							_, err = writer.WriteString("unsure," + target + "\n")
+							_, err = writer.WriteString("unsure,\"" + target + "\"\n")
 							if err != nil {
 								crash("Unable to write to output file", err)
 							}
 						}
 					} else {
-						_, err = writer.WriteString("inscope," + target + "\n")
+						_, err = writer.WriteString("inscope,\"" + target + "\"\n")
 						if err != nil {
 							crash("Unable to write to output file", err)
 						}
@@ -726,16 +732,22 @@ func main() {
 
 }
 
-func updateFireBountyJSON(databaseIsUpdating *bool, tmpFile *os.File, dbFileExists bool) {
+func updateFireBountyJSON(databaseIsUpdating *bool, tmpFile *os.File) error {
 	*databaseIsUpdating = true
 	//get the big JSON from the API
 	req, err := http.NewRequest("GET", firebountyAPIURL, nil)
 	if err != nil {
 		crash("Could not download scopes from firebounty at: "+firebountyAPIURL, err)
 	}
-	jason, _ := http.DefaultClient.Do(req)
+	jason, err := http.DefaultClient.Do(req)
+	if err != nil {
+		if !chainMode {
+			warning("There was an error contacting the firebounty server.")
+		}
+		*databaseIsUpdating = false
+		return err
+	}
 
-	//f, _ := os.OpenFile(firebountyJSONPath, os.O_CREATE|os.O_WRONLY, 0600)
 	tmpFile, err = os.CreateTemp("", "hacker-scoper_tmp-db")
 	if err != nil {
 		crash("Error creating temporary file.", err)
@@ -748,7 +760,8 @@ func updateFireBountyJSON(databaseIsUpdating *bool, tmpFile *os.File, dbFileExis
 	_, err = io.Copy(io.MultiWriter(tmpFile, bar), jason.Body)
 	if err != nil {
 		warning("Error writing to the temporary file at \"" + tmpFile.Name() + "\". Database update cancelled.")
-		return
+		*databaseIsUpdating = false
+		return nil
 	}
 	jason.Body.Close() // #nosec G104 -- There is no situation in which closing the body of the request will cause an error.
 	tmpFile.Close()    // #nosec G104 -- There is no situation in which closing the temp file will cause an error.
@@ -766,6 +779,34 @@ func updateFireBountyJSON(databaseIsUpdating *bool, tmpFile *os.File, dbFileExis
 			warning("Error deleting temp file at \"" + tmpFile.Name() + "\". Please ensure the file is deleted.")
 		}
 	}
+	*databaseIsUpdating = false
+	return nil
+}
+
+func checkForDatabaseUpdates(databaseIsUpdating *bool, tmpFile *os.File) error {
+	// If the db exists...
+	if firebountyJSONFileStats, err := os.Stat(firebountyJSONPath); err == nil {
+		//check age. if age > 24hs
+		yesterday := time.Now().Add(-24 * time.Hour)
+		if firebountyJSONFileStats.ModTime().Before(yesterday) {
+			if !chainMode {
+				fmt.Println("[INFO]: +24hs have passed since the last update to the local firebounty database. Starting update, please wait...")
+			}
+			return updateFireBountyJSON(databaseIsUpdating, tmpFile)
+		}
+	} else if errors.Is(err, os.ErrNotExist) {
+		// The database does not exist.
+		// We'll create it.
+		if !chainMode {
+			fmt.Println("[INFO]: Downloading scopes file and saving in \"" + firebountyJSONPath + "\"")
+		}
+		return updateFireBountyJSON(databaseIsUpdating, tmpFile)
+	} else {
+		crash("Unable to get information about the database file at \""+firebountyJSONPath+"\". Probably a permissions error with the directory the database is saved at. Try using the database argument like '--database /custom/path/to/store/the/firebounty.json'", err)
+	}
+
+	// This last return is unreachable but it must be added to appease the compiler.
+	return nil
 }
 
 func parseScopes(inscopeScopes *[]interface{}, noscopeScopes *[]interface{}, target *interface{}, inscopeExplicitLevel *int, noscopeExplicitLevel *int, includeUnsure bool) (isInsideScope bool, isUnsure bool) {
