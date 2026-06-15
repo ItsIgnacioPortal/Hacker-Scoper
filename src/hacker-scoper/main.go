@@ -291,7 +291,7 @@ func main() {
 		fmt.Println(banner)
 	}
 
-	//validate arguments
+	//validate scope levels
 	if inscopeExplicitLevel != 1 && inscopeExplicitLevel != 2 && inscopeExplicitLevel != 3 {
 		var err error
 		crash("Invalid in-scope explicit-level selected", err)
@@ -299,6 +299,14 @@ func main() {
 	if noscopeExplicitLevel != 1 && noscopeExplicitLevel != 2 && noscopeExplicitLevel != 3 {
 		var err error
 		crash("Invalid no-scope explicit-level selected", err)
+	}
+
+	//validate filepath params
+	if scopesListFilepath == "" && outofScopesListFilepath != "" {
+		if !chainMode {
+			warning("out-of-scope filepath specified, but no in-scope filepath specified. Either both or neither must be specified.")
+		}
+		os.Exit(2)
 	}
 
 	// Validate the targets input
