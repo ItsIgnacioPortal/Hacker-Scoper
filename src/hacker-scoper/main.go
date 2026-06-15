@@ -168,7 +168,6 @@ func main() {
 
   -ch, --chain-mode, --plain, --raw, --no-ansi
       In "chain-mode" we only output the important information. No decorations.
-	    Default: false
 
   --database /path/to/database
       Custom path to the cached firebounty database.
