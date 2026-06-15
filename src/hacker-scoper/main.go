@@ -760,6 +760,7 @@ func updateFireBountyJSON(databaseIsUpdating *bool, tmpFile *os.File, dbFileExis
 			warning("Error deleting temp file at \"" + tmpFile.Name() + "\". Please ensure the file is deleted.")
 		}
 	}
+	*databaseIsUpdating = false
 }
 
 func parseScopes(inscopeScopes *[]interface{}, noscopeScopes *[]interface{}, target *interface{}, inscopeExplicitLevel *int, noscopeExplicitLevel *int, includeUnsure bool) (isInsideScope bool, isUnsure bool) {
