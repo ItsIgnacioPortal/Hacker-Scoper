@@ -408,7 +408,7 @@ func main() {
 			yesterday := time.Now().Add(-24 * time.Hour)
 			if firebountyJSONFileStats.ModTime().Before(yesterday) {
 				if !chainMode {
-					fmt.Println("[INFO]: +24hs have passed since the last update to the local firebounty database. Updating...")
+					fmt.Println("[INFO]: +24hs have passed since the last update to the local firebounty database. Starting update, please wait...")
 				}
 				updateFireBountyJSON(&databaseIsUpdating, tmpFile, true)
 			}
