@@ -742,6 +742,7 @@ func updateFireBountyJSON(databaseIsUpdating *bool, tmpFile *os.File, dbFileExis
 	_, err = io.Copy(io.MultiWriter(tmpFile, bar), jason.Body)
 	if err != nil {
 		warning("Error writing to the temporary file at \"" + tmpFile.Name() + "\". Database update cancelled.")
+		*databaseIsUpdating = false
 		return
 	}
 	jason.Body.Close() // #nosec G104 -- There is no situation in which closing the body of the request will cause an error.
@@ -760,6 +761,7 @@ func updateFireBountyJSON(databaseIsUpdating *bool, tmpFile *os.File, dbFileExis
 			warning("Error deleting temp file at \"" + tmpFile.Name() + "\". Please ensure the file is deleted.")
 		}
 	}
+	*databaseIsUpdating = false
 }
 
 func parseScopes(inscopeScopes *[]interface{}, noscopeScopes *[]interface{}, target *interface{}, inscopeExplicitLevel *int, noscopeExplicitLevel *int, includeUnsure bool) (isInsideScope bool, isUnsure bool) {
